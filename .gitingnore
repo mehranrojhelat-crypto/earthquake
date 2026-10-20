@@ -1,0 +1,8 @@
+text
+__pycache__/
+*.html
+.streamlit/
+.venv/
+venv/
+*.pyc
+.env

@@ -1,0 +1,7 @@
+text
+streamlit>=1.28
+plotly>=5.24
+pandas
+numpy
+scikit-learn
+requests
