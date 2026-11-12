@@ -1,8 +1,13 @@
-text
 __pycache__/
-*.html
-.streamlit/
+*.py[cod]
 .venv/
 venv/
-*.pyc
 .env
+.streamlit/secrets.toml
+*.html
+!docs/*.html
+data/cache/
+*.log
+.DS_Store
+.idea/
+.vscode/

@@ -1,45 +1,149 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
-st.set_page_config(page_title="آمار و نمودار", page_icon="📊", layout="wide")
-st.title("📊 آمار و نمودارها")
+import plotly.graph_objects as go
+from components.filters import apply_common_filters
+from components.theme import apply_theme
+apply_theme()
+st.set_page_config(page_title="آمار و تحلیل", page_icon="📊", layout="wide")
+st.title("📊 آمار و تحلیل لرزه‌ای")
 
 if "df" not in st.session_state:
     st.warning("ابتدا به صفحه اصلی بروید تا داده‌ها بارگذاری شوند.")
     st.stop()
 
-df = st.session_state["df"]
-min_mag = st.sidebar.slider("حداقل magnitude", 4.0, 7.5, 4.0, 0.1)
-df_f = df[df["magnitude"] >= min_mag].copy()
+df_all = st.session_state["df"]
+df = apply_common_filters(df_all, key_prefix="stats")
 
-c1, c2, c3 = st.columns(3)
-c1.metric("تعداد", len(df_f))
-c2.metric("بیشینه mag", f"{df_f['magnitude'].max():.1f}" if len(df_f) else "-")
-c3.metric("میانگین عمق", f"{df_f['depth_km'].mean():.1f} km" if len(df_f) else "-")
+if df.empty:
+    st.info("با فیلترهای انتخاب‌شده داده‌ای وجود ندارد.")
+    st.stop()
 
-yearly = df_f.groupby("year").size().reset_index(name="تعداد")
-fig_year = px.bar(yearly, x="year", y="تعداد", text="تعداد",
-                  title="تعداد زلزله در هر سال", color="تعداد",
-                  color_continuous_scale="YlOrRd")
-st.plotly_chart(fig_year, use_container_width=True)
+# ---------- کارت‌های خلاصه ----------
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("تعداد زلزله", f"{len(df):,}")
+c2.metric("میانگین بزرگی", f"{df['magnitude'].mean():.2f}")
+c3.metric("بیشینه بزرگی", f"{df['magnitude'].max():.1f}")
+c4.metric("میانگین عمق (km)", f"{df['depth_km'].mean():.1f}" if "depth_km" in df.columns else "—")
 
-bins = [4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 10]
-labels = ["4.0-4.5", "4.5-5.0", "5.0-5.5", "5.5-6.0", "6.0-6.5", "6.5-7.0", "≥7.0"]
-df_f["mag_bin"] = pd.cut(df_f["magnitude"], bins=bins, labels=labels, right=False)
-count_df = df_f["mag_bin"].value_counts().reindex(labels).fillna(0).reset_index()
-count_df.columns = ["شدت", "تعداد"]
+st.divider()
 
-fig_mag = px.bar(count_df, x="شدت", y="تعداد", text="تعداد",
-                 title="توزیع شدت", color="تعداد",
-                 color_continuous_scale="YlOrRd")
-st.plotly_chart(fig_mag, use_container_width=True)
+# ---------- ردیف نمودارها ----------
+left, right = st.columns(2)
 
-fig_heat = px.density_map(
-    df_f, lat="latitude", lon="longitude", z="magnitude",
-    radius=18, zoom=4.5, height=550,
-    map_style="open-street-map",
-    color_continuous_scale="YlOrRd",
-    title="نقشه حرارتی",
+with left:
+    st.subheader("توزیع بزرگی")
+    fig_mag = px.histogram(
+        df,
+        x="magnitude",
+        nbins=30,
+        color_discrete_sequence=["#3B82F6"],
+    )
+    fig_mag.update_layout(
+        xaxis_title="Magnitude",
+        yaxis_title="تعداد",
+        height=360,
+        margin=dict(l=10, r=10, t=30, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig_mag, use_container_width=True)
+
+with right:
+    st.subheader("توزیع عمق")
+    if "depth_km" in df.columns:
+        fig_depth = px.histogram(
+            df,
+            x="depth_km",
+            nbins=30,
+            color_discrete_sequence=["#22C55E"],
+        )
+        fig_depth.update_layout(
+            xaxis_title="عمق (km)",
+            yaxis_title="تعداد",
+            height=360,
+            margin=dict(l=10, r=10, t=30, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(fig_depth, use_container_width=True)
+    else:
+        st.info("ستون عمق موجود نیست.")
+
+# ---------- تایم‌لاین ----------
+st.subheader("روند زمانی تعداد زلزله‌ها")
+
+timeline = (
+    df.set_index("time")
+    .resample("MS")["magnitude"]
+    .count()
+    .rename("count")
+    .reset_index()
 )
-st.plotly_chart(fig_heat, use_container_width=True)
+
+fig_time = px.area(
+    timeline,
+    x="time",
+    y="count",
+    color_discrete_sequence=["#F97316"],
+)
+fig_time.update_layout(
+    xaxis_title="زمان",
+    yaxis_title="تعداد زلزله در ماه",
+    height=380,
+    margin=dict(l=10, r=10, t=20, b=10),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+)
+st.plotly_chart(fig_time, use_container_width=True)
+
+# ---------- رابطه بزرگی و عمق ----------
+st.subheader("رابطه بزرگی و عمق")
+if "depth_km" in df.columns:
+    fig_scatter = px.scatter(
+        df,
+        x="depth_km",
+        y="magnitude",
+        color="magnitude",
+        color_continuous_scale="YlOrRd",
+        opacity=0.7,
+        hover_data=["place", "time"],
+    )
+    fig_scatter.update_layout(
+        xaxis_title="عمق (km)",
+        yaxis_title="Magnitude",
+        height=400,
+        margin=dict(l=10, r=10, t=20, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig_scatter, use_container_width=True)
+
+# ---------- جدول خلاصه سالانه ----------
+st.subheader("خلاصه سالانه")
+yearly = (
+    df.groupby("year")
+    .agg(
+        count=("magnitude", "count"),
+        mean_mag=("magnitude", "mean"),
+        max_mag=("magnitude", "max"),
+        mean_depth=("depth_km", "mean"),
+    )
+    .reset_index()
+    .sort_values("year", ascending=False)
+)
+yearly["mean_mag"] = yearly["mean_mag"].round(2)
+yearly["max_mag"] = yearly["max_mag"].round(1)
+yearly["mean_depth"] = yearly["mean_depth"].round(1)
+yearly = yearly.rename(
+    columns={
+        "year": "سال",
+        "count": "تعداد",
+        "mean_mag": "میانگین بزرگی",
+        "max_mag": "بیشینه بزرگی",
+        "mean_depth": "میانگین عمق",
+    }
+)
+st.dataframe(yearly, use_container_width=True, hide_index=True)
+
+st.caption("این آمارها توصیفی هستند و به معنی پیش‌بینی وقوع زلزله آینده نیستند.")

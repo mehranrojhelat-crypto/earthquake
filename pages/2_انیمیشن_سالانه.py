@@ -1,6 +1,20 @@
 import streamlit as st
 import plotly.express as px
 
+from components.theme import apply_theme
+apply_theme()
+st.markdown("""
+<style>
+    .block-container { padding-top: 1.2rem; padding-bottom: 2rem; }
+    div[data-testid="stMetric"] {
+        background: #151F30;
+        border: 1px solid #1F2A44;
+        border-radius: 12px;
+        padding: 12px 14px;
+    }
+    div[data-testid="stMetric"] label { color: #94A3B8 !important; }
+</style>
+""", unsafe_allow_html=True)
 st.set_page_config(page_title="انیمیشن سالانه", page_icon="🎬", layout="wide")
 st.title("🎬 انیمیشن زلزله‌ها سال به سال")
 

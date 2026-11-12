@@ -1,74 +1,98 @@
 import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
+import pandas as pd
+from components.map import build_earthquake_map
+from components.theme import apply_theme
+apply_theme()
+st.markdown("""
+<style>
+    .block-container { padding-top: 1.2rem; padding-bottom: 2rem; }
+    div[data-testid="stMetric"] {
+        background: #151F30;
+        border: 1px solid #1F2A44;
+        border-radius: 12px;
+        padding: 12px 14px;
+    }
+    div[data-testid="stMetric"] label { color: #94A3B8 !important; }
+</style>
+""", unsafe_allow_html=True)
 
-st.set_page_config(page_title="نقشه و گسل", page_icon="🗺️", layout="wide")
-st.title("🗺️ نقشه زلزله‌ها + گسل‌های فعال")
+st.set_page_config(page_title="نقشه زنده", page_icon="🗺️", layout="wide")
+st.title("🗺️ نقشه زنده زلزله‌ها و گسل‌های فعال")
 
 if "df" not in st.session_state:
     st.warning("ابتدا به صفحه اصلی بروید تا داده‌ها بارگذاری شوند.")
     st.stop()
 
-df = st.session_state["df"]
-faults = st.session_state["faults"]
+df = st.session_state["df"].copy()
+faults = st.session_state.get("faults", {"features": []})
 
-min_mag = st.sidebar.slider("حداقل magnitude", 4.0, 7.5, 4.0, 0.1)
+# ---------- فیلترها ----------
+st.sidebar.header("فیلترها")
+
+time_options = {
+    "۲۴ ساعت اخیر": 1,
+    "۷ روز اخیر": 7,
+    "۳۰ روز اخیر": 30,
+    "۹۰ روز اخیر": 90,
+    "۱ سال اخیر": 365,
+    "همه داده‌ها": None,
+}
+time_label = st.sidebar.selectbox("بازه زمانی", list(time_options.keys()), index=5)
+days = time_options[time_label]
+
+min_mag, max_mag = st.sidebar.slider(
+    "بازه بزرگی (Magnitude)",
+    min_value=4.0,
+    max_value=8.0,
+    value=(4.0, 8.0),
+    step=0.1,
+)
+
 show_faults = st.sidebar.checkbox("نمایش گسل‌ها", value=True)
 
-df_f = df[df["magnitude"] >= min_mag].copy()
+# فیلتر زمانی
+if days is not None:
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+    # اگر time بدون timezone باشد، آن را utc فرض می‌کنیم
+    if df["time"].dt.tz is None:
+        df["time"] = df["time"].dt.tz_localize("UTC")
+    df = df[df["time"] >= cutoff]
 
-fig = go.Figure()
+# فیلتر بزرگی
+df = df[(df["magnitude"] >= min_mag) & (df["magnitude"] <= max_mag)]
 
-fig.add_trace(go.Scattermap(
-    lat=df_f["latitude"],
-    lon=df_f["longitude"],
-    mode="markers",
-    marker=dict(
-        size=np.clip(df_f["size"] / 8, 4, 25),
-        color=df_f["magnitude"],
-        colorscale="YlOrRd",
-        showscale=True,
-        colorbar=dict(title="Magnitude"),
-    ),
-    text=df_f["place"],
-    customdata=np.stack([
-        df_f["magnitude"],
-        df_f["depth_km"],
-        df_f["time"].astype(str),
-    ], axis=-1),
-    hovertemplate="<b>%{text}</b><br>Mag: %{customdata[0]:.1f}<br>Depth: %{customdata[1]:.1f} km<br>%{customdata[2]}<extra></extra>",
-    name="زلزله‌ها",
-))
+# ---------- خلاصه ----------
+c1, c2, c3 = st.columns(3)
+c1.metric("تعداد نمایش‌داده‌شده", f"{len(df):,}")
+c2.metric("حداقل بزرگی", f"{min_mag}")
+c3.metric("حداکثر بزرگی", f"{max_mag}")
 
-if show_faults and faults.get("features"):
-    for feat in faults["features"]:
-        geom = feat["geometry"]
-        name = feat.get("properties", {}).get("name", "Fault")
+if df.empty:
+    st.info("با فیلترهای انتخاب‌شده زلزله‌ای پیدا نشد.")
+    st.stop()
 
-        lines = []
-        if geom["type"] == "LineString":
-            lines = [geom["coordinates"]]
-        elif geom["type"] == "MultiLineString":
-            lines = geom["coordinates"]
-
-        for line in lines:
-            lons = [p[0] for p in line]
-            lats = [p[1] for p in line]
-            fig.add_trace(go.Scattermap(
-                lat=lats, lon=lons,
-                mode="lines",
-                line=dict(width=2, color="black"),
-                name=name,
-                hoverinfo="name",
-                showlegend=False,
-            ))
-
-fig.update_layout(
-    map_style="open-street-map",
-    map=dict(center=dict(lat=32.5, lon=54), zoom=4.5),
-    height=700,
-    margin=dict(l=0, r=0, t=30, b=0),
-    title=f"زلزله‌های ≥ {min_mag} + گسل‌های فعال (GEM)",
-)
+# ---------- نقشه ----------
+fig = build_earthquake_map(df, faults=faults, show_faults=show_faults, height=720)
 st.plotly_chart(fig, use_container_width=True)
-st.caption("خطوط سیاه = گسل‌های فعال GEM")
+
+# ---------- جدول آخرین رویدادها ----------
+st.subheader("آخرین زلزله‌های فیلترشده")
+table_df = (
+    df.sort_values("time", ascending=False)
+    .head(30)[["time", "magnitude", "place", "depth_km", "latitude", "longitude"]]
+    .copy()
+)
+table_df["time"] = table_df["time"].dt.strftime("%Y-%m-%d %H:%M")
+table_df = table_df.rename(
+    columns={
+        "time": "زمان (UTC)",
+        "magnitude": "بزرگی",
+        "place": "مکان",
+        "depth_km": "عمق (km)",
+        "latitude": "عرض",
+        "longitude": "طول",
+    }
+)
+st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+st.caption("منبع زلزله: USGS | منبع گسل: GEM Active Faults")

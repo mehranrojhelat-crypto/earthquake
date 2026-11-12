@@ -1,76 +1,50 @@
-markdown
-# سامانه تحلیل زلزله ایران 🌍
+# Earthquake Intelligence Platform — ایران
 
-تحلیل زلزله‌های ایران با داده‌های USGS، نمایش گسل‌های فعال (GEM)، مصورسازی و یادگیری ماشین.
+سامانه تحلیل و مانیتورینگ زلزله‌های ایران با داده USGS و گسل‌های فعال GEM.
 
 ## قابلیت‌ها
+- دریافت خودکار زلزله‌های ایران از USGS
+- نقشه تعاملی + فیلتر زمانی و بزرگی
+- نمایش گسل‌های فعال (GEM)
+- آمار و نمودارهای توصیفی
+- صفحات اختصاصی شهرهای مهم
+- تحلیل فاصله زلزله‌ها تا گسل
+- مدل‌های آزمایشی یادگیری ماشین (طبقه‌بندی / رگرسیون / خوشه‌بندی)
 
-- دریافت خودکار زلزله‌های ۱۰ سال اخیر ایران از USGS
-- نقشه تعاملی زلزله + گسل‌های فعال
-- نمودارهای آماری (سالانه، توزیع شدت، heatmap، انیمیشن)
-- طبقه‌بندی (پیش‌بینی magnitude ≥ ۵)
-- رگرسیون (پیش‌بینی مقدار magnitude)
-- خوشه‌بندی مناطق پرخطر (KMeans)
-
-## ساختار پروژه
-
-```
-earthquake/
-├── app.py              # داشبورد وب (Streamlit)
-├── earthquake.py       # نسخه اسکریپت خط فرمان (اختیاری)
-└── README.md
-```
+## هشدار علمی
+مدل‌های ML این پروژه برای پیش‌بینی قطعی زمان یا مکان زلزله آینده نیستند.
+خروجی‌ها تحلیل آماری رویدادهای ثبت‌شده هستند.
 
 ## نصب
-
 ```bash
-pip install streamlit plotly pandas numpy scikit-learn requests
-```
-
-اگر به PyPI دسترسی ندارید (مثلاً در ایران):
-
-```bash
-pip install streamlit plotly pandas numpy scikit-learn requests -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ## اجرا
-
-### داشبورد وب (پیشنهادی)
-
 ```bash
 streamlit run app.py
 ```
 
-مرورگر روی `http://localhost:8501` باز می‌شود.
-
-### نسخه خط فرمان
-
-```bash
-python earthquake.py
+## ساختار پروژه
+```text
+earthquake/
+├── app.py
+├── config.py
+├── components/
+├── services/
+├── models/
+├── utils/
+├── pages/
+└── tests/
 ```
 
-نمودارها به صورت HTML ذخیره می‌شوند.
-
 ## منابع داده
+- USGS Earthquake Catalog
+- GEM Global Active Faults
 
-| منبع | توضیح |
-|------|--------|
-| [USGS](https://earthquake.usgs.gov/) | کاتالوگ زلزله |
-| [GEM Global Active Faults](https://github.com/cossatot/gem-global-active-faults) | گسل‌های فعال (CC BY-SA) |
-
-## نکات
-
-- اولین اجرا ممکن است به دلیل دانلود داده و گسل‌ها کمی طول بکشد.
-- داده زلزله و گسل‌ها در حافظه کش Streamlit ذخیره می‌شوند.
-- برای Plotly نسخه ۷ از `Scattermap` استفاده شده است.
-
-## توسعه آینده
-
-- پیش‌بینی زمانی (سری زمانی)
-- فاصله از نزدیک‌ترین گسل به‌عنوان ویژگی
-- هشدار برای مناطق پرخطر
-- استقرار آنلاین (Streamlit Cloud / Hugging Face)
-
-## مجوز
-
-کد آزاد است. برای داده گسل‌ها مجوز GEM (CC BY-SA) رعایت شود.
+## توسعه بعدی
+- بهینه‌سازی محاسبه فاصله تا گسل
+- گزارش‌گیری Excel/PDF
+- استقرار آنلاین
