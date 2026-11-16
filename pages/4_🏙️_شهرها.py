@@ -1,3 +1,4 @@
+# pages/4_🏙️_شهرها.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,18 +7,32 @@ from config import MAJOR_CITIES
 from utils.geo import filter_by_radius
 from components.map import build_earthquake_map
 from components.theme import apply_theme
-apply_theme()
+from services.usgs import fetch_earthquakes
+from services.gem import fetch_iran_faults
+
 st.set_page_config(page_title="صفحات شهرها", page_icon="🏙️", layout="wide")
+apply_theme()
+
 st.title("🏙️ تحلیل لرزه‌ای شهرهای مهم")
 
+# اگر مستقیم وارد صفحه شد، داده را همین‌جا لود کن
 if "df" not in st.session_state:
-    st.warning("ابتدا به صفحه اصلی بروید تا داده‌ها بارگذاری شوند.")
-    st.stop()
+    with st.spinner("در حال بارگذاری داده‌ها..."):
+        df, start_time, end_time = fetch_earthquakes()
+        faults = fetch_iran_faults()
+        st.session_state["df"] = df
+        st.session_state["faults"] = faults
+        st.session_state["start_time"] = start_time
+        st.session_state["end_time"] = end_time
 
 df_all = st.session_state["df"].copy()
 faults = st.session_state.get("faults", {"features": []})
 
-# ---------- انتخاب شهر و فیلترها ----------
+if not MAJOR_CITIES:
+    st.error("لیست شهرها در config.py تعریف نشده است.")
+    st.stop()
+
+# ---------- فیلترها ----------
 city_name = st.sidebar.selectbox("انتخاب شهر", list(MAJOR_CITIES.keys()))
 city = MAJOR_CITIES[city_name]
 
@@ -28,10 +43,8 @@ radius = st.sidebar.slider(
     value=int(city["radius_km"]),
     step=10,
 )
-
 min_mag = st.sidebar.slider("حداقل بزرگی", 4.0, 7.0, 4.0, 0.1)
 
-# فیلتر زمانی ساده
 time_options = {
     "۹۰ روز اخیر": 90,
     "۱ سال اخیر": 365,
@@ -59,26 +72,26 @@ st.caption(f"مرکز: ({city['lat']:.3f}, {city['lon']:.3f}) | شعاع: {radiu
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("تعداد زلزله", f"{len(city_df):,}")
 
-if not city_df.empty:
-    c2.metric("میانگین بزرگی", f"{city_df['magnitude'].mean():.2f}")
-    c3.metric("بیشینه بزرگی", f"{city_df['magnitude'].max():.1f}")
-    nearest = city_df.loc[city_df["distance_km"].idxmin()]
-    c4.metric("نزدیک‌ترین رویداد", f"{nearest['distance_km']:.1f} km")
-else:
+if city_df.empty:
     c2.metric("میانگین بزرگی", "—")
     c3.metric("بیشینه بزرگی", "—")
     c4.metric("نزدیک‌ترین رویداد", "—")
-    st.info("در این بازه و شعاع، زلزله‌ای ثبت نشده است.")
+    st.warning("در این بازه و شعاع زلزله‌ای ثبت نشده. شعاع را بیشتر کن یا بازه را «همه داده‌ها» بگذار.")
     st.stop()
 
-# ---------- نقشه محلی ----------
+c2.metric("میانگین بزرگی", f"{city_df['magnitude'].mean():.2f}")
+c3.metric("بیشینه بزرگی", f"{city_df['magnitude'].max():.1f}")
+nearest = city_df.loc[city_df["distance_km"].idxmin()]
+c4.metric("نزدیک‌ترین رویداد", f"{nearest['distance_km']:.1f} km")
+
+# ---------- نقشه ----------
 fig = build_earthquake_map(
     city_df,
     faults=faults,
     show_faults=True,
     center_lat=city["lat"],
     center_lon=city["lon"],
-    zoom=6.5,
+    zoom=6.2,
     height=560,
 )
 st.plotly_chart(fig, use_container_width=True)
@@ -108,24 +121,42 @@ fig_time.update_layout(
 )
 st.plotly_chart(fig_time, use_container_width=True)
 
-# ---------- توزیع بزرگی ----------
+# ---------- توزیع‌ها ----------
 left, right = st.columns(2)
 with left:
     st.subheader("توزیع بزرگی")
-    fig_mag = px.histogram(city_df, x="magnitude", nbins=20, color_discrete_sequence=["#F97316"])
-    fig_mag.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig_mag = px.histogram(
+        city_df,
+        x="magnitude",
+        nbins=20,
+        color_discrete_sequence=["#F97316"],
+    )
+    fig_mag.update_layout(
+        height=320,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig_mag, use_container_width=True)
 
 with right:
     st.subheader("فاصله از مرکز شهر")
-    fig_dist = px.histogram(city_df, x="distance_km", nbins=20, color_discrete_sequence=["#22C55E"])
-    fig_dist.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    fig_dist = px.histogram(
+        city_df,
+        x="distance_km",
+        nbins=20,
+        color_discrete_sequence=["#22C55E"],
+    )
+    fig_dist.update_layout(
+        height=320,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
     st.plotly_chart(fig_dist, use_container_width=True)
 
-# ---------- جدول آخرین رویدادها ----------
+# ---------- جدول ----------
 st.subheader("نزدیک‌ترین / جدیدترین زلزله‌ها")
 table = (
-    city_df.sort_values(["time"], ascending=False)
+    city_df.sort_values("time", ascending=False)
     .head(40)[
         ["time", "magnitude", "place", "depth_km", "distance_km", "latitude", "longitude"]
     ]

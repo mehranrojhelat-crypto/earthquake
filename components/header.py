@@ -11,7 +11,7 @@ def render_header(last_update: pd.Timestamp | None = None):
         f"""
         <div class="app-header">
             <h1>🌍 Earthquake Intelligence Platform</h1>
-            <p>سامانه تحلیل و مانیتورینگ زلزله ایران · آخرین به‌روزرسانی: {update_txt}</p>
+            <p>مانیتورینگ و تحلیل زلزله ایران · آخرین به‌روزرسانی: {update_txt}</p>
         </div>
         """,
         unsafe_allow_html=True,

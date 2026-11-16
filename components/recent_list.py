@@ -12,7 +12,10 @@ def _mag_color(m: float) -> str:
     return "#EF4444"
 
 def render_recent_earthquakes(df: pd.DataFrame, n: int = 8):
-    st.markdown('<div class="panel-card"><div class="panel-title">آخرین زلزله‌ها</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-card"><div class="panel-title">آخرین زلزله‌ها</div>',
+        unsafe_allow_html=True,
+    )
 
     if df is None or df.empty:
         st.write("داده‌ای نیست.")
@@ -25,7 +28,7 @@ def render_recent_earthquakes(df: pd.DataFrame, n: int = 8):
         t = row["time"]
         if hasattr(t, "strftime"):
             t = t.strftime("%m-%d %H:%M")
-        place = str(row.get("place", ""))[:42]
+        place = str(row.get("place", ""))[:40]
         st.markdown(
             f"""
             <div class="eq-item">
@@ -33,7 +36,7 @@ def render_recent_earthquakes(df: pd.DataFrame, n: int = 8):
                     M {row['magnitude']:.1f}
                 </span>
                 {place}<br>
-                <span style="color:#94A3B8;font-size:0.8rem;">{t} UTC</span>
+                <span class="muted">{t} UTC</span>
             </div>
             """,
             unsafe_allow_html=True,
