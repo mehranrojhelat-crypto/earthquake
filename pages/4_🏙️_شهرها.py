@@ -9,6 +9,7 @@ from components.map import build_earthquake_map
 from components.theme import apply_theme
 from services.usgs import fetch_earthquakes
 from services.gem import fetch_iran_faults
+from components.theme import apply_theme
 
 st.set_page_config(page_title="صفحات شهرها", page_icon="🏙️", layout="wide")
 apply_theme()

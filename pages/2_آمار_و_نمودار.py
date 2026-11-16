@@ -97,6 +97,35 @@ fig_time.update_layout(
 )
 st.plotly_chart(fig_time, use_container_width=True)
 
+
+
+st.subheader("نقشه حرارتی تراکم زلزله‌ها")
+
+heat_df = df.copy()
+if len(heat_df) > 5000:
+    heat_df = heat_df.sort_values("time", ascending=False).head(5000)
+
+fig_heat = px.density_map(
+    heat_df,
+    lat="latitude",
+    lon="longitude",
+    z="magnitude",
+    radius=18,
+    center=dict(lat=32.5, lon=54.0),
+    zoom=4.5,
+    height=650,
+    color_continuous_scale="YlOrRd",
+    title="نقشه حرارتی تراکم زلزله‌ها (Heatmap)",
+)
+fig_heat.update_layout(
+    map_style="open-street-map",
+    margin=dict(r=0, t=40, l=0, b=0),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+)
+st.plotly_chart(fig_heat, use_container_width=True)
+st.caption("رنگ گرم‌تر = تراکم/شدت بیشتر رویدادها در آن ناحیه")
+
 # ---------- رابطه بزرگی و عمق ----------
 st.subheader("رابطه بزرگی و عمق")
 if "depth_km" in df.columns:
